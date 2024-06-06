@@ -6,7 +6,8 @@ pub fn run(options: &[ResolvedOption]) -> String {
         value: ResolvedValue::User(user, _), ..
     }) = options.first()
     {
-        format!("{}'s id is {}", user.tag(), user.id)
+        // println!("{:#?}", options.first());
+        format!("{}'s id is {}", user.name, user.id)
     } else {
         "Please provide a valid user".to_string()
     }
