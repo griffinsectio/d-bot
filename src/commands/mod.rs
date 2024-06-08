@@ -6,3 +6,4 @@ pub mod ping;
 pub mod welcome;
 pub mod wonderful_command;
 pub mod time;
+pub mod date;

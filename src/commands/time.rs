@@ -8,5 +8,5 @@ pub fn run(_options: &[ResolvedOption]) -> String {
 }
 
 pub fn register() -> CreateCommand {
-    CreateCommand::new("time").description("Show current time in Indonesia's WIB")
+    CreateCommand::new("time").description("Show current time in western Indonesian time")
 }

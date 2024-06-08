@@ -63,6 +63,7 @@ impl EventHandler for Handler {
             let content = match command.data.name.as_str() {
                 "attachmentinput" => Some(commands::attachmentinput::run(&command.data.options())),
                 "ping" => Some(commands::ping::run(&command.data.options())),
+                "date" => Some(commands::date::run(&command.data.options())),
                 "time" => Some(commands::time::run(&command.data.options())),
                 "id" => Some(commands::id::run(&command.data.options())),
                 _ => Some("not implemented :(".to_string()),
@@ -115,6 +116,7 @@ impl EventHandler for Handler {
         let commands = guild_id
             .set_commands(&ctx.http, vec![
                 commands::ping::register(),
+                commands::date::register(),
                 commands::time::register(),
                 commands::id::register(),
             ])
