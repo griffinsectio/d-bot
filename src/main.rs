@@ -1,13 +1,25 @@
 mod commands;
 
 use std::env;
+use std::collections::HashMap;
+use std::fmt::format;
+use std::io::Read;
+
+use serde::{Deserialize, Serialize};
+use serde_json;
 
 use serenity::async_trait;
 use serenity::builder::{CreateInteractionResponse, CreateInteractionResponseMessage};
+use serenity::model::channel::Message;
 use serenity::model::application::{Command, Interaction};
 use serenity::model::gateway::Ready;
 use serenity::model::id::GuildId;
 use serenity::prelude::*;
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Quote {
+    quote_map: HashMap<String, String>
+}
 
 struct Handler;
 
@@ -49,6 +61,7 @@ impl EventHandler for Handler {
             println!("Received command interaction: {command:#?}");
 
             let content = match command.data.name.as_str() {
+                "attachmentinput" => Some(commands::attachmentinput::run(&command.data.options())),
                 "ping" => Some(commands::ping::run(&command.data.options())),
                 "time" => Some(commands::time::run(&command.data.options())),
                 "id" => Some(commands::id::run(&command.data.options())),
@@ -61,6 +74,30 @@ impl EventHandler for Handler {
                 if let Err(why) = command.create_response(&ctx.http, builder).await {
                     println!("Cannot respond to slash command: {why}");
                 }
+            }
+        }
+    }
+
+    async fn message(&self, ctx: Context, msg: Message) {
+        if msg.content == "!quote" {
+            let client = reqwest::Client::new();
+            
+            let response = client.get("https://api.api-ninjas.com/v1/quotes?category=learning").header("X-Api-Key", "Z2ytj/98rE3yJqDwrCWSIQ==aivJAU2IWJeDdDEa").send().await.unwrap();
+
+            let body = response.text().await.unwrap();
+
+            let result: Quote = serde_json::from_str(body.as_str()).unwrap();
+
+            let quote = format!("\"{}\"", result.quote_map.get("quote").unwrap());
+            let author = format!("\\- {}", result.quote_map.get("author").unwrap());
+
+            let content = format!("{}\n{}", quote, author);
+
+            // Sending a message can fail, due to a network error, an authentication error, or lack
+            // of permissions to post in the channel, so log to stdout when some error happens,
+            // with a description of it.
+            if let Err(why) = msg.channel_id.say(&ctx.http, content).await {
+                println!("Error sending message: {why:?}");
             }
         }
     }
@@ -96,8 +133,10 @@ async fn main() {
     // Configure the client with your Discord bot token in the environment.
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
 
+    let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::DIRECT_MESSAGES | GatewayIntents::MESSAGE_CONTENT;
+
     // Build our client.
-    let mut client = Client::builder(token, GatewayIntents::empty())
+    let mut client = Client::builder(token, intents)
         .event_handler(Handler)
         .await
         .expect("Error creating client");
