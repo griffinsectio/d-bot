@@ -9,6 +9,11 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_json;
 
+use joketeller::{
+    Joker, Category,
+};
+
+use serenity::all::{ChannelId, CreateMessage};
 use serenity::async_trait;
 use serenity::builder::{CreateInteractionResponse, CreateInteractionResponseMessage};
 use serenity::model::channel::Message;
@@ -103,6 +108,30 @@ impl EventHandler for Handler {
             // Sending a message can fail, due to a network error, an authentication error, or lack
             // of permissions to post in the channel, so log to stdout when some error happens,
             // with a description of it.
+            if let Err(why) = msg.channel_id.say(&ctx.http, content).await {
+                println!("Error sending message: {why:?}");
+            }
+        } else if msg.content == "!joke" {
+            let mut joker_instance: Joker = Joker::new();
+    
+            // Chainable API
+            joker_instance
+                .add_categories(&mut vec![Category::Programming, Category::Pun, Category::Dark, Category::Spooky]);
+            
+            // get JSON joke
+            let joke = joker_instance.get_joke().unwrap();
+
+            let content: String;
+
+            if joke["type"].as_str().unwrap() == "twopart" {
+                let setup = joke["setup"].as_str().unwrap();
+                let delivery = joke["delivery"].as_str().unwrap();
+                content = format!("{}\n{}", setup, delivery);
+
+            } else {
+                content = format!("{}", joke["joke"].as_str().unwrap());
+            }
+            
             if let Err(why) = msg.channel_id.say(&ctx.http, content).await {
                 println!("Error sending message: {why:?}");
             }
