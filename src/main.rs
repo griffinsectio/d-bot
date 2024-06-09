@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::fmt::format;
 use std::io::Read;
 
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_json;
 
@@ -12,7 +13,7 @@ use serenity::async_trait;
 use serenity::builder::{CreateInteractionResponse, CreateInteractionResponseMessage};
 use serenity::model::channel::Message;
 use serenity::model::application::{Command, Interaction};
-use serenity::model::gateway::Ready;
+use serenity::model::gateway::{Presence, Ready};
 use serenity::model::id::GuildId;
 use serenity::prelude::*;
 
@@ -81,9 +82,14 @@ impl EventHandler for Handler {
 
     async fn message(&self, ctx: Context, msg: Message) {
         if msg.content == "!quote" {
+            let topics = vec!["learning", "intelligence", "knowledge", "leadership", "success"];
+            let rand_index = (rand::thread_rng().gen::<f64>() * topics.len() as f64).floor() as usize;
+            let rand_topic = topics[rand_index];
+
             let client = reqwest::Client::new();
+            let url = format!("https://api.api-ninjas.com/v1/quotes?category={}", rand_topic);
             
-            let response = client.get("https://api.api-ninjas.com/v1/quotes?category=learning").header("X-Api-Key", "Z2ytj/98rE3yJqDwrCWSIQ==aivJAU2IWJeDdDEa").send().await.unwrap();
+            let response = client.get(url).header("X-Api-Key", "Z2ytj/98rE3yJqDwrCWSIQ==aivJAU2IWJeDdDEa").send().await.unwrap();
 
             let body = response.text().await.unwrap();
 
