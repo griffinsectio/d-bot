@@ -1,31 +1,31 @@
 mod commands;
 
 use std::env;
-use std::collections::HashMap;
-use std::fmt::format;
-use std::io::Read;
 
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use serde_json;
+use serde_json::{self, Value};
 
 use joketeller::{
     Joker, Category,
 };
 
-use serenity::all::{ChannelId, CreateMessage};
+use reqwest::Url;
+
+use serenity::all::CreateMessage;
 use serenity::async_trait;
-use serenity::builder::{CreateInteractionResponse, CreateInteractionResponseMessage};
+use serenity::builder::{CreateEmbed, CreateEmbedFooter, CreateAttachment, CreateInteractionResponse, CreateInteractionResponseMessage};
 use serenity::model::channel::Message;
 use serenity::model::application::{Command, Interaction};
-use serenity::model::gateway::{Presence, Ready};
+use serenity::model::gateway::Ready;
 use serenity::model::id::GuildId;
+use serenity::model::Timestamp;
 use serenity::prelude::*;
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Quote {
-    quote_map: HashMap<String, String>
-}
+// struct Quote {
+//     quote_map: HashMap<String, String>
+// }
 
 struct Handler;
 
@@ -87,6 +87,8 @@ impl EventHandler for Handler {
 
     async fn message(&self, ctx: Context, msg: Message) {
         if msg.content == "!quote" {
+            let token = env::var("API_NINJA_TOKEN").expect("Expected a token in the environment");
+
             let topics = vec!["learning", "intelligence", "knowledge", "leadership", "success"];
             let rand_index = (rand::thread_rng().gen::<f64>() * topics.len() as f64).floor() as usize;
             let rand_topic = topics[rand_index];
@@ -94,14 +96,14 @@ impl EventHandler for Handler {
             let client = reqwest::Client::new();
             let url = format!("https://api.api-ninjas.com/v1/quotes?category={}", rand_topic);
             
-            let response = client.get(url).header("X-Api-Key", "Z2ytj/98rE3yJqDwrCWSIQ==aivJAU2IWJeDdDEa").send().await.unwrap();
+            let response = client.get(url).header("X-Api-Key", token).send().await.unwrap();
 
             let body = response.text().await.unwrap();
 
-            let result: Quote = serde_json::from_str(body.as_str()).unwrap();
+            let result: Value = serde_json::from_str(body.as_str()).unwrap();
 
-            let quote = format!("\"{}\"", result.quote_map.get("quote").unwrap());
-            let author = format!("\\- {}", result.quote_map.get("author").unwrap());
+            let quote = format!("\"{}\"", result[0]["quote"]);
+            let author = format!("\\- {}", result[0]["author"]);
 
             let content = format!("{}\n{}", quote, author);
 
@@ -133,6 +135,31 @@ impl EventHandler for Handler {
             }
             
             if let Err(why) = msg.channel_id.say(&ctx.http, content).await {
+                println!("Error sending message: {why:?}");
+            }
+        } else if msg.content == "!cat" {
+            let client = reqwest::Client::new();
+            let url = "https://api.thecatapi.com/v1/images/search";
+            
+            let response = client.get(url).send().await.unwrap();
+
+            let body = response.text().await.unwrap();
+
+            let result: Value = serde_json::from_str(body.as_str()).unwrap();
+
+            let cat_url = Url::parse(result[0]["url"].as_str().unwrap()).unwrap();
+
+            let downloaded_bytes = client.get(cat_url).send().await.unwrap().bytes().await.unwrap();
+
+            std::fs::write("cat.jpg", downloaded_bytes).unwrap();
+
+            let builder = CreateMessage::new()
+                .content("Here's a picture of cat to brighten up your day :3")
+                .add_file(CreateAttachment::path("./cat.jpg").await.unwrap());
+
+            let msg = msg.channel_id.send_message(&ctx.http, builder).await;
+
+            if let Err(why) = msg {
                 println!("Error sending message: {why:?}");
             }
         }
