@@ -1,6 +1,6 @@
 mod commands;
 
-use std::env;
+use std::{env, result};
 
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -153,13 +153,28 @@ impl EventHandler for Handler {
 
             std::fs::write("cat.jpg", downloaded_bytes).unwrap();
 
-            let builder = CreateMessage::new()
+            let picture = CreateMessage::new()
                 .content("Here's a picture of cat to brighten up your day :3")
                 .add_file(CreateAttachment::path("./cat.jpg").await.unwrap());
 
-            let msg = msg.channel_id.send_message(&ctx.http, builder).await;
+            let msg = msg.channel_id.send_message(&ctx.http, picture).await;
 
             if let Err(why) = msg {
+                println!("Error sending message: {why:?}");
+            }
+        } else if msg.content == "!advice" {
+            let client = reqwest::Client::new();
+            let url = "https://api.adviceslip.com/advice";
+
+            let response = client.get(url).send().await.unwrap();
+
+            let response_json = response.text().await.unwrap();
+
+            let result_json: serde_json::Value = serde_json::from_str(&response_json.as_str()).unwrap();
+
+            let content = CreateMessage::new().content(result_json["slip"]["advice"].as_str().unwrap());
+
+            if let Err(why) = msg.channel_id.send_message(&ctx.http, content).await {
                 println!("Error sending message: {why:?}");
             }
         }
