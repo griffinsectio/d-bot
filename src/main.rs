@@ -2,7 +2,7 @@ mod commands;
 
 use std::{env, result};
 
-use rand::Rng;
+use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use serde_json::{self, Value};
 
@@ -90,7 +90,7 @@ impl EventHandler for Handler {
             let token = env::var("API_NINJA_TOKEN").expect("Expected a token in the environment");
 
             let topics = vec!["learning", "intelligence", "knowledge", "leadership", "success"];
-            let rand_index = (rand::thread_rng().gen::<f64>() * topics.len() as f64).floor() as usize;
+            let rand_index = rand::random::<usize>() % topics.len();
             let rand_topic = topics[rand_index];
 
             let client = reqwest::Client::new();
@@ -161,6 +161,8 @@ impl EventHandler for Handler {
 
             if let Err(why) = msg {
                 println!("Error sending message: {why:?}");
+            } else {
+                std::fs::remove_file("./cat.jpg").unwrap();
             }
         } else if msg.content == "!advice" {
             let client = reqwest::Client::new();
@@ -176,6 +178,34 @@ impl EventHandler for Handler {
 
             if let Err(why) = msg.channel_id.send_message(&ctx.http, content).await {
                 println!("Error sending message: {why:?}");
+            }
+        } else if msg.content == "!image" {
+            let topics = vec!["cat", "dog", "nature", "computer", "ai", "painting"];
+            let random_topic = topics[rand::random::<usize>() % topics.len()];
+            let pictures_amount = 50;
+
+            let client = reqwest::Client::new();
+            let url = format!("https://api.pexels.com/v1/search?query={}&per_page={}", random_topic, pictures_amount);
+            let token = env::var("PEXELS_TOKEN").expect("Expected pexels.com token");
+            let response = client.get(url).header("Authorization", token).send().await.unwrap();
+            let response_text = response.text().await.unwrap();
+            let parsed_json: Value = serde_json::from_str(response_text.as_str()).unwrap();
+
+            let random_index = rand::random::<usize>() % 50;
+            let image_url = Url::parse(parsed_json["photos"][random_index]["src"]["original"].as_str().unwrap()).unwrap();
+            let image_bytes = client.get(image_url.clone()).send().await.unwrap().bytes().await.unwrap();
+            std::fs::write("./image.jpeg", image_bytes).unwrap();
+
+            let picture = CreateMessage::new()
+            .content("Here's a random picture from pexels.com")
+            .add_file(CreateAttachment::path("./image.jpeg").await.unwrap());
+
+            let msg = msg.channel_id.send_message(&ctx.http, picture).await;
+
+            if let Err(why) = msg {
+                println!("Error sending message: {why:?}");
+            } else {
+                std::fs::remove_file("./image.jpeg").unwrap();
             }
         }
     }
