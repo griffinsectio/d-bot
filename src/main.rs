@@ -70,6 +70,10 @@ impl EventHandler for Handler {
                 "attachmentinput" => Some(commands::attachmentinput::run(&command.data.options())),
                 "ping" => Some(commands::ping::run(&command.data.options())),
                 "date" => Some(commands::date::run(&command.data.options())),
+                "modal" => { 
+                    commands::modal::run(&ctx, &command).await.unwrap();
+                    None
+                }
                 "time" => Some(commands::time::run(&command.data.options())),
                 "id" => Some(commands::id::run(&command.data.options())),
                 _ => Some("not implemented :(".to_string()),
@@ -106,6 +110,7 @@ impl EventHandler for Handler {
             let author = format!("\\- {}", result[0]["author"]);
 
             let content = format!("{}\n{}", quote, author);
+            
 
             // Sending a message can fail, due to a network error, an authentication error, or lack
             // of permissions to post in the channel, so log to stdout when some error happens,
@@ -182,11 +187,12 @@ impl EventHandler for Handler {
         } else if msg.content == "!image" {
             let topics = vec!["cat", "dog", "nature", "computer", "ai", "painting"];
             let random_topic = topics[rand::random::<usize>() % topics.len()];
+            // By default it will fetch 50 trending gifs
             let pictures_amount = 50;
 
             let client = reqwest::Client::new();
             let url = format!("https://api.pexels.com/v1/search?query={}&per_page={}", random_topic, pictures_amount);
-            let token = env::var("PEXELS_TOKEN").expect("Expected pexels.com token");
+            let token = env::var("PEXELS_TOKEN").expect("Expected pexels.com token in environment");
             let response = client.get(url).header("Authorization", token).send().await.unwrap();
             let response_text = response.text().await.unwrap();
             let parsed_json: Value = serde_json::from_str(response_text.as_str()).unwrap();
@@ -207,6 +213,25 @@ impl EventHandler for Handler {
             } else {
                 std::fs::remove_file("./image.jpeg").unwrap();
             }
+        } else if msg.content == "!gif" {
+            let client = reqwest::Client::new();
+            let token = env::var("GIPHY_TOKEN").expect("Expected giphy.com API in environment");
+            let amount = 50;
+            let url = format!("https://api.giphy.com/v1/gifs/trending?api_key={}&limit={}", token, amount);
+            
+            let response = client.get(url).send().await.unwrap();
+            let response_text = response.text().await.unwrap();
+            
+            let parsed_json: Value = serde_json::from_str(response_text.as_str()).unwrap();
+            let random_index = rand::random::<usize>() % amount;
+            let embed_url = parsed_json["data"][random_index]["embed_url"].as_str().unwrap();
+            // let embed = CreateEmbed::new().url(embed_url);
+
+            let message = CreateMessage::new().content(embed_url);
+
+            if let Err(why) = msg.channel_id.send_message(&ctx.http, message).await {
+                println!("Error sending message: {why:?}");
+            }
         }
     }
 
@@ -226,6 +251,7 @@ impl EventHandler for Handler {
                 commands::date::register(),
                 commands::time::register(),
                 commands::id::register(),
+                commands::modal::register(),
             ])
             .await;
 
