@@ -216,6 +216,7 @@ impl EventHandler for Handler {
         } else if msg.content == "!gif" {
             let client = reqwest::Client::new();
             let token = env::var("GIPHY_TOKEN").expect("Expected giphy.com API in environment");
+            // By default it will fetch 50 trending gifs
             let amount = 50;
             let url = format!("https://api.giphy.com/v1/gifs/trending?api_key={}&limit={}", token, amount);
             
@@ -232,8 +233,28 @@ impl EventHandler for Handler {
             if let Err(why) = msg.channel_id.send_message(&ctx.http, message).await {
                 println!("Error sending message: {why:?}");
             }
+        } else if msg.content == "!sticker" {
+            let client = reqwest::Client::new();
+            let token = env::var("GIPHY_TOKEN").expect("Expected giphy.com API in environment");
+            // By default it will fetch 50 trending stickers
+            let amount = 50;
+            let url = format!("https://api.giphy.com/v1/stickers/trending?api_key={}&limit={}", token, amount);
+            
+            let response = client.get(url).send().await.unwrap();
+            let response_text = response.text().await.unwrap();
+            
+            let parsed_json: Value = serde_json::from_str(response_text.as_str()).unwrap();
+            let random_index = rand::random::<usize>() % amount;
+            let embed_url = parsed_json["data"][random_index]["embed_url"].as_str().unwrap();
+            // let embed = CreateEmbed::new().url(embed_url);
+
+            let message = CreateMessage::new().content(embed_url);
+
+            if let Err(why) = msg.channel_id.send_message(&ctx.http, message).await {
+                println!("Error sending message: {why:?}");
+            }
         }
-    }
+    } 
 
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
