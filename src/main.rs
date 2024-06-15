@@ -1,9 +1,7 @@
 mod commands;
 
-use std::{env, result};
+use std::env;
 
-use rand::{thread_rng, Rng};
-use serde::{Deserialize, Serialize};
 use serde_json::{self, Value};
 
 use joketeller::{
@@ -13,275 +11,273 @@ use joketeller::{
 use reqwest::Url;
 
 use serenity::all::CreateMessage;
-use serenity::async_trait;
-use serenity::builder::{CreateEmbed, CreateEmbedFooter, CreateAttachment, CreateInteractionResponse, CreateInteractionResponseMessage};
-use serenity::model::channel::Message;
-use serenity::model::application::{Command, Interaction};
-use serenity::model::gateway::Ready;
-use serenity::model::id::GuildId;
-use serenity::model::Timestamp;
-use serenity::prelude::*;
+use serenity::builder::CreateAttachment;
 
-#[derive(Debug, Serialize, Deserialize)]
-// struct Quote {
-//     quote_map: HashMap<String, String>
-// }
+use poise::{serenity_prelude as serenity, CreateReply};
 
-struct Handler;
 
-// #[async_trait]
-// impl EventHandler for Handler {
-//     // Set a handler for the `message` event. This is called whenever a new message is received.
-//     //
-//     // Event handlers are dispatched through a threadpool, and so multiple events can be
-//     // dispatched simultaneously.
-//     async fn message(&self, ctx: Context, msg: Message) {
-//         if msg.content == "!ping" {
-//             // Sending a message can fail, due to a network error, an authentication error, or lack
-//             // of permissions to post in the channel, so log to stdout when some error happens,
-//             // with a description of it.
-//             if let Err(why) = msg.channel_id.say(&ctx.http, "Pong!").await {
-//                 println!("Error sending message: {why:?}");
-//             }
-//         } else if msg.content == "!hello" {
-//             if let Err(why) = msg.channel_id.say(&ctx.http, "Hi there!").await {
-//                 println!("Error sending message: {why:?}");
-//             }
-//         }
-//     }
+struct Data {} // User data, which is stored and accessible in all command invocations
+type Error = Box<dyn std::error::Error + Send + Sync>;
+type Context<'a> = poise::Context<'a, Data, Error>;
 
-//     // Set a handler to be called on the `ready` event. This is called when a shard is booted, and
-//     // a READY payload is sent by Discord. This payload contains data like the current user's guild
-//     // Ids, current user data, private channels, and more.
-//     //
-//     // In this case, just print what the current user's username is.
-//     async fn ready(&self, _: Context, ready: Ready) {
-//         println!("{} is connected!", ready.user.name);
-//     }
-// }
+#[poise::command(slash_command, description_localized("en-US", "Ping the bot"))]
+async fn ping(
+    ctx: Context<'_>,
+) -> Result<(), Error> {
+    ctx.say("Pong!").await.unwrap();
+    Ok(())
+}
 
-#[async_trait]
-impl EventHandler for Handler {
-    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        if let Interaction::Command(command) = interaction {
-            println!("Received command interaction: {command:#?}");
+#[poise::command(slash_command, description_localized("en-US", "Fetch an advice from adviceslip.com"))]
+async fn advice(
+    ctx: Context<'_>,
+) -> Result<(), Error> {
+    // let msg = serenity::CreateMessage::new().content("Fetching an advice...");
+    // let original_msg_id = ctx.channel_id().send_message(&ctx.http(), msg).await.unwrap().id;
+    let fetching_advice = ctx.say("Fetching an advice...").await.unwrap();
 
-            let content = match command.data.name.as_str() {
-                "attachmentinput" => Some(commands::attachmentinput::run(&command.data.options())),
-                "ping" => Some(commands::ping::run(&command.data.options())),
-                "date" => Some(commands::date::run(&command.data.options())),
-                "modal" => { 
-                    commands::modal::run(&ctx, &command).await.unwrap();
-                    None
-                }
-                "time" => Some(commands::time::run(&command.data.options())),
-                "id" => Some(commands::id::run(&command.data.options())),
-                _ => Some("not implemented :(".to_string()),
-            };
+    let client = reqwest::Client::new();
+    let url = "https://api.adviceslip.com/advice";
 
-            if let Some(content) = content {
-                let data = CreateInteractionResponseMessage::new().content(content);
-                let builder = CreateInteractionResponse::Message(data);
-                if let Err(why) = command.create_response(&ctx.http, builder).await {
-                    println!("Cannot respond to slash command: {why}");
-                }
-            }
-        }
-    }
+    let response = client.get(url).send().await.unwrap();
+    let response_json = response.text().await.unwrap();
 
-    async fn message(&self, ctx: Context, msg: Message) {
-        if msg.content == "!quote" {
-            let token = env::var("API_NINJA_TOKEN").expect("Expected a token in the environment");
+    let result_json: serde_json::Value = serde_json::from_str(&response_json.as_str()).unwrap();
+    let advice = result_json["slip"]["advice"].as_str().unwrap();
 
-            let topics = vec!["learning", "intelligence", "knowledge", "leadership", "success"];
-            let rand_index = rand::random::<usize>() % topics.len();
-            let rand_topic = topics[rand_index];
+    let create_reply = CreateReply {
+        content: Some(advice.to_string()),
+        ..Default::default()
+    };
 
-            let client = reqwest::Client::new();
-            let url = format!("https://api.api-ninjas.com/v1/quotes?category={}", rand_topic);
-            
-            let response = client.get(url).header("X-Api-Key", token).send().await.unwrap();
+    fetching_advice.edit(ctx, create_reply).await.unwrap();
 
-            let body = response.text().await.unwrap();
+    Ok(())
+}
 
-            let result: Value = serde_json::from_str(body.as_str()).unwrap();
+#[poise::command(slash_command, description_localized("en-US", "Fetch a sticker from giphy.com"))]
+async fn sticker(
+    ctx: Context<'_>
+) -> Result<(), Error> {
+    let fetching = ctx.say("Fetching a sticker from giphy.com").await.unwrap();
 
-            let quote = format!("\"{}\"", result[0]["quote"]);
-            let author = format!("\\- {}", result[0]["author"]);
+    let client = reqwest::Client::new();
+    let token = env::var("GIPHY_TOKEN").expect("Expected giphy.com API in environment");
 
-            let content = format!("{}\n{}", quote, author);
-            
-
-            // Sending a message can fail, due to a network error, an authentication error, or lack
-            // of permissions to post in the channel, so log to stdout when some error happens,
-            // with a description of it.
-            if let Err(why) = msg.channel_id.say(&ctx.http, content).await {
-                println!("Error sending message: {why:?}");
-            }
-        } else if msg.content == "!joke" {
-            let mut joker_instance: Joker = Joker::new();
+    // By default it will fetch 50 trending stickers
+    let amount = 50;
+    let url = format!("https://api.giphy.com/v1/stickers/trending?api_key={}&limit={}", token, amount);
     
-            // Chainable API
-            joker_instance
-                .add_categories(&mut vec![Category::Programming, Category::Pun, Category::Dark, Category::Spooky]);
-            
-            // get JSON joke
-            let joke = joker_instance.get_joke().unwrap();
+    let response = client.get(url).send().await.unwrap();
+    let response_text = response.text().await.unwrap();
+    
+    let parsed_json: Value = serde_json::from_str(response_text.as_str()).unwrap();
+    let random_index = rand::random::<usize>() % amount;
+    let embed_url = parsed_json["data"][random_index]["embed_url"].as_str().unwrap();
+    // let embed = CreateEmbed::new().url(embed_url);
 
-            let content: String;
+    let create_reply = CreateReply {
+        content: Some(embed_url.to_string()),
+        ..Default::default()
+    };
 
-            if joke["type"].as_str().unwrap() == "twopart" {
-                let setup = joke["setup"].as_str().unwrap();
-                let delivery = joke["delivery"].as_str().unwrap();
-                content = format!("{}\n{}", setup, delivery);
+    fetching.edit(ctx, create_reply).await.unwrap();
 
-            } else {
-                content = format!("{}", joke["joke"].as_str().unwrap());
-            }
-            
-            if let Err(why) = msg.channel_id.say(&ctx.http, content).await {
-                println!("Error sending message: {why:?}");
-            }
-        } else if msg.content == "!cat" {
-            let client = reqwest::Client::new();
-            let url = "https://api.thecatapi.com/v1/images/search";
-            
-            let response = client.get(url).send().await.unwrap();
+    // let message = CreateMessage::new().content(embed_url);
 
-            let body = response.text().await.unwrap();
+    Ok(())
+}
 
-            let result: Value = serde_json::from_str(body.as_str()).unwrap();
+#[poise::command(slash_command, description_localized("en-US", "Fetch a gif from giphy.com"))]
+async fn gif(
+    ctx: Context<'_>,
+) -> Result<(), Error> {
+    let fetching = ctx.say("Fetching a gif from giphy.com").await.unwrap();
 
-            let cat_url = Url::parse(result[0]["url"].as_str().unwrap()).unwrap();
+    let client = reqwest::Client::new();
+    let token = env::var("GIPHY_TOKEN").expect("Expected giphy.com API in environment");
 
-            let downloaded_bytes = client.get(cat_url).send().await.unwrap().bytes().await.unwrap();
+    // By default it will fetch 50 trending stickers
+    let amount = 50;
+    let url = format!("https://api.giphy.com/v1/gifs/trending?api_key={}&limit={}", token, amount);
+    
+    let response = client.get(url).send().await.unwrap();
+    let response_text = response.text().await.unwrap();
+    
+    let parsed_json: Value = serde_json::from_str(response_text.as_str()).unwrap();
+    let random_index = rand::random::<usize>() % amount;
+    let embed_url = parsed_json["data"][random_index]["embed_url"].as_str().unwrap();
+    // let embed = CreateEmbed::new().url(embed_url);
 
-            std::fs::write("cat.jpg", downloaded_bytes).unwrap();
+    let create_reply = CreateReply {
+        content: Some(embed_url.to_string()),
+        ..Default::default()
+    };
 
-            let picture = CreateMessage::new()
-                .content("Here's a picture of cat to brighten up your day :3")
-                .add_file(CreateAttachment::path("./cat.jpg").await.unwrap());
+    fetching.edit(ctx, create_reply).await.unwrap();
 
-            let msg = msg.channel_id.send_message(&ctx.http, picture).await;
+    // let message = CreateMessage::new().content(embed_url);
 
-            if let Err(why) = msg {
-                println!("Error sending message: {why:?}");
-            } else {
-                std::fs::remove_file("./cat.jpg").unwrap();
-            }
-        } else if msg.content == "!advice" {
-            let client = reqwest::Client::new();
-            let url = "https://api.adviceslip.com/advice";
+    Ok(())
+}
 
-            let response = client.get(url).send().await.unwrap();
+#[poise::command(slash_command, description_localized("en-US", "Fetch random image from pexels.com"))]
+async fn image(
+    ctx: Context<'_>
+) -> Result<(), Error> {
+    let fetching = ctx.say("Fetching an image from pexels.com").await.unwrap();
 
-            let response_json = response.text().await.unwrap();
+    let topics = vec!["cat", "dog", "nature", "computer", "ai", "painting"];
+    let random_topic = topics[rand::random::<usize>() % topics.len()];
+    // By default it will fetch 50 trending gifs
+    let pictures_amount = 50;
 
-            let result_json: serde_json::Value = serde_json::from_str(&response_json.as_str()).unwrap();
+    let client = reqwest::Client::new();
+    let url = format!("https://api.pexels.com/v1/search?query={}&per_page={}", random_topic, pictures_amount);
+    let token = env::var("PEXELS_TOKEN").expect("Expected pexels.com token in environment");
+    let response = client.get(url).header("Authorization", token).send().await.unwrap();
+    let response_text = response.text().await.unwrap();
+    let parsed_json: Value = serde_json::from_str(response_text.as_str()).unwrap();
 
-            let content = CreateMessage::new().content(result_json["slip"]["advice"].as_str().unwrap());
+    let random_index = rand::random::<usize>() % 50;
+    let image_url = Url::parse(parsed_json["photos"][random_index]["src"]["original"].as_str().unwrap()).unwrap();
+    let image_bytes = client.get(image_url.clone()).send().await.unwrap().bytes().await.unwrap();
+    std::fs::write("./image.jpeg", image_bytes).unwrap();
 
-            if let Err(why) = msg.channel_id.send_message(&ctx.http, content).await {
-                println!("Error sending message: {why:?}");
-            }
-        } else if msg.content == "!image" {
-            let topics = vec!["cat", "dog", "nature", "computer", "ai", "painting"];
-            let random_topic = topics[rand::random::<usize>() % topics.len()];
-            // By default it will fetch 50 trending gifs
-            let pictures_amount = 50;
+    let picture = CreateMessage::new()
+    .content("Here's a random picture from pexels.com")
+    .add_file(CreateAttachment::path("./image.jpeg").await.unwrap());
 
-            let client = reqwest::Client::new();
-            let url = format!("https://api.pexels.com/v1/search?query={}&per_page={}", random_topic, pictures_amount);
-            let token = env::var("PEXELS_TOKEN").expect("Expected pexels.com token in environment");
-            let response = client.get(url).header("Authorization", token).send().await.unwrap();
-            let response_text = response.text().await.unwrap();
-            let parsed_json: Value = serde_json::from_str(response_text.as_str()).unwrap();
+    let msg = ctx.channel_id().send_message(&ctx.http(), picture).await;
 
-            let random_index = rand::random::<usize>() % 50;
-            let image_url = Url::parse(parsed_json["photos"][random_index]["src"]["original"].as_str().unwrap()).unwrap();
-            let image_bytes = client.get(image_url.clone()).send().await.unwrap().bytes().await.unwrap();
-            std::fs::write("./image.jpeg", image_bytes).unwrap();
-
-            let picture = CreateMessage::new()
-            .content("Here's a random picture from pexels.com")
-            .add_file(CreateAttachment::path("./image.jpeg").await.unwrap());
-
-            let msg = msg.channel_id.send_message(&ctx.http, picture).await;
-
-            if let Err(why) = msg {
-                println!("Error sending message: {why:?}");
-            } else {
-                std::fs::remove_file("./image.jpeg").unwrap();
-            }
-        } else if msg.content == "!gif" {
-            let client = reqwest::Client::new();
-            let token = env::var("GIPHY_TOKEN").expect("Expected giphy.com API in environment");
-            // By default it will fetch 50 trending gifs
-            let amount = 50;
-            let url = format!("https://api.giphy.com/v1/gifs/trending?api_key={}&limit={}", token, amount);
-            
-            let response = client.get(url).send().await.unwrap();
-            let response_text = response.text().await.unwrap();
-            
-            let parsed_json: Value = serde_json::from_str(response_text.as_str()).unwrap();
-            let random_index = rand::random::<usize>() % amount;
-            let embed_url = parsed_json["data"][random_index]["embed_url"].as_str().unwrap();
-            // let embed = CreateEmbed::new().url(embed_url);
-
-            let message = CreateMessage::new().content(embed_url);
-
-            if let Err(why) = msg.channel_id.send_message(&ctx.http, message).await {
-                println!("Error sending message: {why:?}");
-            }
-        } else if msg.content == "!sticker" {
-            let client = reqwest::Client::new();
-            let token = env::var("GIPHY_TOKEN").expect("Expected giphy.com API in environment");
-            // By default it will fetch 50 trending stickers
-            let amount = 50;
-            let url = format!("https://api.giphy.com/v1/stickers/trending?api_key={}&limit={}", token, amount);
-            
-            let response = client.get(url).send().await.unwrap();
-            let response_text = response.text().await.unwrap();
-            
-            let parsed_json: Value = serde_json::from_str(response_text.as_str()).unwrap();
-            let random_index = rand::random::<usize>() % amount;
-            let embed_url = parsed_json["data"][random_index]["embed_url"].as_str().unwrap();
-            // let embed = CreateEmbed::new().url(embed_url);
-
-            let message = CreateMessage::new().content(embed_url);
-
-            if let Err(why) = msg.channel_id.send_message(&ctx.http, message).await {
-                println!("Error sending message: {why:?}");
-            }
-        }
-    } 
-
-    async fn ready(&self, ctx: Context, ready: Ready) {
-        println!("{} is connected!", ready.user.name);
-
-        let guild_id = GuildId::new(
-            env::var("GUILD_ID")
-                .expect("Expected GUILD_ID in environment")
-                .parse()
-                .expect("GUILD_ID must be an integer"),
-        );
-
-        let commands = guild_id
-            .set_commands(&ctx.http, vec![
-                commands::ping::register(),
-                commands::date::register(),
-                commands::time::register(),
-                commands::id::register(),
-                commands::modal::register(),
-            ])
-            .await;
-
-        println!("I now have the following guild slash commands: {commands:#?}");
-
-        let guild_command =
-            Command::create_global_command(&ctx.http, commands::wonderful_command::register()).await;
-        println!("I created the following global slash command: {guild_command:#?}");
+    if let Err(why) = msg {
+        println!("Error sending message: {why:?}");
+    } else {
+        fetching.delete(ctx).await.unwrap();
+        std::fs::remove_file("./image.jpeg").unwrap();
     }
+
+    Ok(())
+}
+
+#[poise::command(slash_command, description_localized("en-US", "Fetch a quote from api-ninjas.com"))]
+async fn quote(
+    ctx: Context<'_>
+) -> Result<(), Error> {
+    let fetching = ctx.say("Fetching a quote from apininjas.com").await.unwrap();
+
+    let token = env::var("API_NINJA_TOKEN").expect("Expected a token in the environment");
+    let topics = vec!["learning", "intelligence", "knowledge", "leadership", "success"];
+
+    let rand_index = rand::random::<usize>() % topics.len();
+    let rand_topic = topics[rand_index];
+
+    let client = reqwest::Client::new();
+    let url = format!("https://api.api-ninjas.com/v1/quotes?category={}", rand_topic);
+    
+    let response = client.get(url).header("X-Api-Key", token).send().await.unwrap();
+
+    let body = response.text().await.unwrap();
+
+    let result: Value = serde_json::from_str(body.as_str()).unwrap();
+
+    let quote = format!("\"{}\"", result[0]["quote"].as_str().unwrap());
+    let author = format!("\\- {}", result[0]["author"].as_str().unwrap());
+
+    let content = format!("{}\n{}", quote, author);
+
+    let edited_message = CreateReply {
+        content: Some(content),
+        ..Default::default()
+    };
+
+    if let Err(why) = fetching.edit(ctx, edited_message).await {
+        println!("Error sending message: {}", why);
+    }
+
+    Ok(())
+}
+
+#[poise::command(slash_command, description_localized("en-US", "Throw a joke"))]
+async fn joke(
+    ctx: Context<'_>
+) -> Result<(), Error> {
+    let fetching = ctx.say("Thinking of a joke...").await.unwrap();
+
+    let mut joker_instance: Joker = Joker::new();
+
+    // Chainable API
+    joker_instance
+        .add_categories(&mut vec![Category::Programming, Category::Pun, Category::Dark, Category::Spooky]);
+    
+    // get JSON joke
+    let joke = joker_instance.get_joke().unwrap();
+
+    let content: String;
+
+    if joke["type"].as_str().unwrap() == "twopart" {
+        let setup = joke["setup"].as_str().unwrap();
+        let delivery = joke["delivery"].as_str().unwrap();
+        content = format!("{}\n{}", setup, delivery);
+
+    } else {
+        content = format!("{}", joke["joke"].as_str().unwrap());
+    }
+    
+    let edited_message = CreateReply {
+        content: Some(content),
+        ..Default::default()
+    };
+
+    if let Err(why) = fetching.edit(ctx, edited_message).await {
+        println!("Error sending message: {why:?}");
+    }
+
+    Ok(())
+}
+
+#[poise::command(slash_command, description_localized("en-US", "Send a cute cat photo ><"))]
+async fn cat(
+    ctx: Context<'_>
+) -> Result<(), Error> {
+    let fetching = ctx.say("Finding a cute cat pic from thecatapi.com").await.unwrap();
+    let client = reqwest::Client::new();
+    let url = "https://api.thecatapi.com/v1/images/search";
+    
+    let response = client.get(url).send().await.unwrap();
+
+    let body = response.text().await.unwrap();
+
+    let result: Value = serde_json::from_str(body.as_str()).unwrap();
+
+    let cat_url = Url::parse(result[0]["url"].as_str().unwrap()).unwrap();
+
+    let downloaded_bytes = client.get(cat_url).send().await.unwrap().bytes().await.unwrap();
+
+    std::fs::write("cat.jpg", downloaded_bytes).unwrap();
+
+    let picture = CreateMessage::new()
+        .content("Here's a picture of cat to brighten up your day :3")
+        .add_file(CreateAttachment::path("./cat.jpg").await.unwrap());
+
+    let msg = ctx.channel_id().send_message(&ctx.http(), picture).await;
+
+    if let Err(why) = msg {
+        println!("Error sending message: {why:?}");
+    } else {
+        fetching.delete(ctx).await.unwrap();
+        std::fs::remove_file("./cat.jpg").unwrap();
+    }
+
+    Ok(())
+}
+
+#[poise::command(prefix_command)]
+pub async fn register(
+    ctx: Context<'_>
+) -> Result<(), Error> {
+    poise::builtins::register_application_commands_buttons(ctx).await?;
+    Ok(())
 }
 
 #[tokio::main]
@@ -289,11 +285,27 @@ async fn main() {
     // Configure the client with your Discord bot token in the environment.
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
 
-    let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::DIRECT_MESSAGES | GatewayIntents::MESSAGE_CONTENT;
+    // let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::DIRECT_MESSAGES | GatewayIntents::MESSAGE_CONTENT;
+    let intents = serenity::GatewayIntents::non_privileged();
+
+    let framework = poise::Framework::builder()
+    .options(poise::FrameworkOptions {
+        commands: vec![register(), ping(), advice(), sticker(), gif(), image(), quote(), joke(), cat()],
+        ..Default::default()
+    })
+    .setup(|ctx, _ready, framework| {
+        Box::pin(async move {
+            println!("{} connected!", _ready.user.name);
+            poise::builtins::register_globally(ctx, &framework.options().commands).await.unwrap();
+            Ok(Data {})
+        })
+    })
+    .build();
 
     // Build our client.
-    let mut client = Client::builder(token, intents)
-        .event_handler(Handler)
+    let mut client = serenity::Client::builder(token, intents)
+        .framework(framework)
+        // .event_handler(Handler)
         .await
         .expect("Error creating client");
 
