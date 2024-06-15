@@ -123,17 +123,19 @@ async fn gif(
 
 #[poise::command(slash_command, description_localized("en-US", "Fetch random image from pexels.com"))]
 async fn image(
-    ctx: Context<'_>
+    ctx: Context<'_>,
+    #[description = "Topic of the random image"]
+    topic: String
 ) -> Result<(), Error> {
     let fetching = ctx.say("Fetching an image from pexels.com").await.unwrap();
 
-    let topics = vec!["cat", "dog", "nature", "computer", "ai", "painting"];
-    let random_topic = topics[rand::random::<usize>() % topics.len()];
-    // By default it will fetch 50 trending gifs
+    // let topics = vec!["cat", "dog", "nature", "computer", "ai", "painting"];
+    // let random_topic = topics[rand::random::<usize>() % topics.len()];
+    // By default it will fetch 50 trending images
     let pictures_amount = 50;
 
     let client = reqwest::Client::new();
-    let url = format!("https://api.pexels.com/v1/search?query={}&per_page={}", random_topic, pictures_amount);
+    let url = format!("https://api.pexels.com/v1/search?query={}&per_page={}", topic, pictures_amount);
     let token = env::var("PEXELS_TOKEN").expect("Expected pexels.com token in environment");
     let response = client.get(url).header("Authorization", token).send().await.unwrap();
     let response_text = response.text().await.unwrap();
