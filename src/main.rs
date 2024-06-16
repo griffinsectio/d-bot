@@ -13,7 +13,7 @@ use reqwest::Url;
 use serenity::all::CreateMessage;
 use serenity::builder::CreateAttachment;
 
-use poise::{serenity_prelude as serenity, CreateReply};
+use poise::{serenity_prelude as serenity, ChoiceParameter, CreateReply};
 
 
 struct Data {} // User data, which is stored and accessible in all command invocations
@@ -129,9 +129,6 @@ async fn image(
 ) -> Result<(), Error> {
     let fetching = ctx.say("Fetching an image from pexels.com").await.unwrap();
 
-    // let topics = vec!["cat", "dog", "nature", "computer", "ai", "painting"];
-    // let random_topic = topics[rand::random::<usize>() % topics.len()];
-    // By default it will fetch 50 trending images
     let pictures_amount = 50;
 
     let client = reqwest::Client::new();
@@ -162,20 +159,32 @@ async fn image(
     Ok(())
 }
 
+#[derive(Debug, poise::ChoiceParameter)]
+enum QuoteTopic {
+    #[name = "Learning"]
+    Learning,
+    #[name = "Intelligence"]
+    Intelligence,
+    #[name = "Knowledge"]
+    Knowledge,
+    #[name = "Leadership"]
+    Leadership,
+    #[name = "Success"]
+    Success,
+}
+
 #[poise::command(slash_command, description_localized("en-US", "Fetch a quote from api-ninjas.com"))]
 async fn quote(
-    ctx: Context<'_>
+    ctx: Context<'_>,
+    topic: QuoteTopic,
 ) -> Result<(), Error> {
     let fetching = ctx.say("Fetching a quote from apininjas.com").await.unwrap();
 
     let token = env::var("API_NINJA_TOKEN").expect("Expected a token in the environment");
-    let topics = vec!["learning", "intelligence", "knowledge", "leadership", "success"];
-
-    let rand_index = rand::random::<usize>() % topics.len();
-    let rand_topic = topics[rand_index];
 
     let client = reqwest::Client::new();
-    let url = format!("https://api.api-ninjas.com/v1/quotes?category={}", rand_topic);
+    let url = format!("https://api.api-ninjas.com/v1/quotes?category={}", topic.name().to_lowercase());
+    println!("{url}");
     
     let response = client.get(url).header("X-Api-Key", token).send().await.unwrap();
 
