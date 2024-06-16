@@ -55,18 +55,20 @@ async fn advice(
     Ok(())
 }
 
-#[poise::command(slash_command, description_localized("en-US", "Fetch a sticker from giphy.com"))]
-async fn sticker(
-    ctx: Context<'_>
+#[poise::command(slash_command, description_localized("en-US", "Fetch a gif from giphy.com"))]
+async fn gif(
+    ctx: Context<'_>,
+    #[description = "Search gif by keyword"]
+    search: String,
 ) -> Result<(), Error> {
-    let fetching = ctx.say("Fetching a sticker from giphy.com").await.unwrap();
+    let fetching = ctx.say("Fetching a gif from giphy.com").await.unwrap();
 
     let client = reqwest::Client::new();
     let token = env::var("GIPHY_TOKEN").expect("Expected giphy.com API in environment");
 
     // By default it will fetch 50 trending stickers
     let amount = 50;
-    let url = format!("https://api.giphy.com/v1/stickers/trending?api_key={}&limit={}", token, amount);
+    let url = format!("https://api.giphy.com/v1/gifs/search?api_key={}&q={}&limit={}", token, search, amount);
     
     let response = client.get(url).send().await.unwrap();
     let response_text = response.text().await.unwrap();
@@ -88,18 +90,20 @@ async fn sticker(
     Ok(())
 }
 
-#[poise::command(slash_command, description_localized("en-US", "Fetch a gif from giphy.com"))]
-async fn gif(
+#[poise::command(slash_command, description_localized("en-US", "Fetch a sticker from giphy.com"))]
+async fn sticker(
     ctx: Context<'_>,
+    #[description = "Search sticker by keyword"]
+    search: String,
 ) -> Result<(), Error> {
-    let fetching = ctx.say("Fetching a gif from giphy.com").await.unwrap();
+    let fetching = ctx.say("Fetching a sticker from giphy.com").await.unwrap();
 
     let client = reqwest::Client::new();
     let token = env::var("GIPHY_TOKEN").expect("Expected giphy.com API in environment");
 
     // By default it will fetch 50 trending stickers
     let amount = 50;
-    let url = format!("https://api.giphy.com/v1/gifs/trending?api_key={}&limit={}", token, amount);
+    let url = format!("https://api.giphy.com/v1/stickers/search?api_key={}&q={}&limit={}", token, search, amount);
     
     let response = client.get(url).send().await.unwrap();
     let response_text = response.text().await.unwrap();
@@ -135,16 +139,25 @@ async fn image(
     let url = format!("https://api.pexels.com/v1/search?query={}&per_page={}", topic, pictures_amount);
     let token = env::var("PEXELS_TOKEN").expect("Expected pexels.com token in environment");
     let response = client.get(url).header("Authorization", token).send().await.unwrap();
+
     let response_text = response.text().await.unwrap();
     let parsed_json: Value = serde_json::from_str(response_text.as_str()).unwrap();
 
-    let random_index = rand::random::<usize>() % 50;
-    let image_url = Url::parse(parsed_json["photos"][random_index]["src"]["original"].as_str().unwrap()).unwrap();
+
+    let images = parsed_json["photos"].as_array().unwrap();
+
+    if images.len() == 0 {
+        ctx.say("Unable to find any image...").await.unwrap();
+        return Ok(());
+    }
+
+    let random_index = rand::random::<usize>() % images.len();
+    let image_url = Url::parse(images[random_index]["src"]["original"].as_str().unwrap()).unwrap();
     let image_bytes = client.get(image_url.clone()).send().await.unwrap().bytes().await.unwrap();
     std::fs::write("./image.jpeg", image_bytes).unwrap();
 
     let picture = CreateMessage::new()
-    .content("Here's a random picture from pexels.com")
+    .content("Here's the image I found from pexels.com")
     .add_file(CreateAttachment::path("./image.jpeg").await.unwrap());
 
     let msg = ctx.channel_id().send_message(&ctx.http(), picture).await;
