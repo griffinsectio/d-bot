@@ -1,10 +1,9 @@
-use serenity::builder::CreateCommand;
-use serenity::model::application::ResolvedOption;
+use crate::*;
 
-pub fn run(_options: &[ResolvedOption]) -> String {
-    "Pong!".to_string()
-}
-
-pub fn register() -> CreateCommand {
-    CreateCommand::new("ping").description("A ping command")
+#[poise::command(slash_command, description_localized("en-US", "Ping the bot"))]
+pub async fn ping(
+    ctx: Context<'_>,
+) -> Result<(), Error> {
+    ctx.say("Pong!").await.unwrap();
+    Ok(())
 }
