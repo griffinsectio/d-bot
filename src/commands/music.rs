@@ -8,7 +8,7 @@ pub async fn music(
 ) -> Result<(), Error> {
     let fetching = ctx.say("Downloading the music for you...").await.unwrap();
     
-    let _yt_dlp = process::Command::new("./src/yt-dlp")
+    let _yt_dlp = process::Command::new("./src/commands/yt-dlp")
     .arg("-S acodec:m4a")
     .arg("-f ba")
     .arg("-o %(title)s.%(ext)s")

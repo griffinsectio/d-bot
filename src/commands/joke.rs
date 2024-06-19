@@ -5,29 +5,16 @@ pub async fn joke(
     ctx: Context<'_>
 ) -> Result<(), Error> {
     let fetching = ctx.say("Thinking of a joke...").await.unwrap();
+    let client = reqwest::Client::new();
+    let token = env::var("API_NINJA_TOKEN").expect("Expected a token in the environment");
+    let response = client.get("https://api.api-ninjas.com/v1/jokes?").header("X-Api-Key", token).send().await.unwrap();
+    let response_text = response.text().await.unwrap();
 
-    let mut joker_instance: Joker = Joker::new();
+    let parse_result: Value = serde_json::from_str(response_text.as_str()).unwrap();
+    let content = parse_result[0]["joke"].as_str().unwrap();
 
-    // Chainable API
-    joker_instance
-        .add_categories(&mut vec![Category::Programming, Category::Pun, Category::Dark, Category::Spooky]);
-    
-    // get JSON joke
-    let joke = joker_instance.get_joke().unwrap();
-
-    let content: String;
-
-    if joke["type"].as_str().unwrap() == "twopart" {
-        let setup = joke["setup"].as_str().unwrap();
-        let delivery = joke["delivery"].as_str().unwrap();
-        content = format!("{}\n{}", setup, delivery);
-
-    } else {
-        content = format!("{}", joke["joke"].as_str().unwrap());
-    }
-    
     let edited_message = CreateReply {
-        content: Some(content),
+        content: Some(content.to_string()),
         ..Default::default()
     };
 

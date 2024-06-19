@@ -9,16 +9,13 @@ use commands::music::music;
 use commands::quote::quote;
 use commands::sticker::sticker;
 use commands::trivia::trivia;
+use commands::about::about;
 
 use std::env;
 use std::process;
 use std::fs;
 
 use serde_json::{self, Value};
-
-use joketeller::{
-    Joker, Category,
-};
 
 use reqwest::Url;
 
@@ -51,7 +48,7 @@ async fn main() {
 
     let framework = poise::Framework::builder()
     .options(poise::FrameworkOptions {
-        commands: vec![register(), ping(), advice(), sticker(), gif(), image(), quote(), joke(), cat(), music(), trivia()],
+        commands: vec![register(), ping(), advice(), sticker(), gif(), image(), quote(), joke(), cat(), music(), trivia(), about()],
         ..Default::default()
     })
     .setup(|ctx, _ready, framework| {

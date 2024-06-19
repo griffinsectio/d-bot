@@ -17,9 +17,8 @@ pub async fn trivia(
 
         let mut correct_answer_user = 0;
 
-        let mut choices = vec![];
-
         for question in questions {
+            let mut choices = vec![];
             let question_text = html_escape::decode_html_entities(question["question"].as_str().unwrap()).to_string();
             let correct_answer = html_escape::decode_html_entities(question["correct_answer"].as_str().unwrap()).to_string();
             let incorrect_answers = question["incorrect_answers"].as_array().unwrap();
@@ -111,7 +110,6 @@ pub async fn trivia(
                     std::thread::sleep(std::time::Duration::from_millis(1500));
                     msg.delete(&ctx.http()).await.unwrap();
 
-                    choices.clear();
                     break;
                 } else {
                     msg.edit(
@@ -126,7 +124,6 @@ pub async fn trivia(
                     std::thread::sleep(std::time::Duration::from_millis(1500));
                     msg.delete(&ctx.http()).await.unwrap();
 
-                    choices.clear();
                     break;
                 }
             }

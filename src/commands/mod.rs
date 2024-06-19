@@ -8,3 +8,4 @@ pub mod music;
 pub mod quote;
 pub mod sticker;
 pub mod trivia;
+pub mod about;

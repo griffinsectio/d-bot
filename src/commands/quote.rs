@@ -25,7 +25,6 @@ pub async fn quote(
 
     let client = reqwest::Client::new();
     let url = format!("https://api.api-ninjas.com/v1/quotes?category={}", topic.name().to_lowercase());
-    println!("{url}");
     
     let response = client.get(url).header("X-Api-Key", token).send().await.unwrap();
 
