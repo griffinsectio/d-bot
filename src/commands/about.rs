@@ -1,6 +1,6 @@
 use crate::*;
 
-#[poise::command(slash_command)]
+#[poise::command(slash_command, description_localized("en-US", "Get information about user"))]
 pub async fn about(
     ctx: Context<'_>,
     user: serenity::User,

@@ -1,6 +1,6 @@
 use crate::*;
 
-#[poise::command(slash_command)]
+#[poise::command(slash_command, description_localized("en-US", "Trivia video games questions game"))]
 pub async fn trivia(
     ctx: Context<'_>,
 ) -> Result<(), Error> {
