@@ -10,6 +10,7 @@ use commands::quote::quote;
 use commands::sticker::sticker;
 use commands::trivia::trivia;
 use commands::about::about;
+use commands::riddle::riddle;
 
 use std::env;
 use std::process;
@@ -48,7 +49,7 @@ async fn main() {
 
     let framework = poise::Framework::builder()
     .options(poise::FrameworkOptions {
-        commands: vec![register(), ping(), advice(), sticker(), gif(), image(), quote(), joke(), cat(), music(), trivia(), about()],
+        commands: vec![register(), ping(), advice(), sticker(), gif(), image(), quote(), joke(), cat(), music(), trivia(), about(), riddle()],
         ..Default::default()
     })
     .setup(|ctx, _ready, framework| {
