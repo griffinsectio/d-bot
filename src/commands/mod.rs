@@ -10,3 +10,4 @@ pub mod sticker;
 pub mod trivia;
 pub mod about;
 pub mod riddle;
+pub mod name;
