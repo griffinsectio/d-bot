@@ -12,6 +12,7 @@ use commands::trivia::trivia;
 use commands::about::about;
 use commands::riddle::riddle;
 use commands::name::name;
+use commands::password::password;
 
 use std::env;
 use std::process;
@@ -50,7 +51,23 @@ async fn main() {
 
     let framework = poise::Framework::builder()
     .options(poise::FrameworkOptions {
-        commands: vec![register(), ping(), advice(), sticker(), gif(), image(), quote(), joke(), cat(), music(), trivia(), about(), riddle(), name()],
+        commands: vec![
+            register(),
+            ping(),
+            advice(),
+            sticker(),
+            gif(),
+            image(),
+            quote(),
+            joke(),
+            cat(),
+            music(),
+            trivia(),
+            about(),
+            riddle(),
+            name(),
+            password(),
+            ],
         ..Default::default()
     })
     .setup(|ctx, _ready, framework| {
