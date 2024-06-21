@@ -13,6 +13,7 @@ use commands::about::about;
 use commands::riddle::riddle;
 use commands::name::name;
 use commands::password::password;
+use commands::dadjoke::dadjoke;
 
 use std::env;
 use std::process;
@@ -67,6 +68,7 @@ async fn main() {
             riddle(),
             name(),
             password(),
+            dadjoke(),
             ],
         ..Default::default()
     })

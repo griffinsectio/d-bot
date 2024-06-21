@@ -12,3 +12,4 @@ pub mod about;
 pub mod riddle;
 pub mod name;
 pub mod password;
+pub mod dadjoke;
